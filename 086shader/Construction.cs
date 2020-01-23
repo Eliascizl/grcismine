@@ -5,7 +5,7 @@ using System.Collections.Generic;
 
 namespace Scene3D
 {
-  public class Construction
+  public class ConstructionS
   {
     #region Form initialization
 
@@ -37,7 +37,7 @@ namespace Scene3D
 
     #region Construction
 
-    public Construction ()
+    public ConstructionS ()
     {
       // Any one-time initialization code goes here..
     }
