@@ -73,7 +73,7 @@ namespace _087fireworks
       {
         // emit a new particle:
         Vector3d dir = Geometry.RandomDirectionNormal(rnd, aim, fw.variance);         // random direction around 'aim'
-        Particle p = new ExplodingParticle(position, dir * rnd.RandomDouble(8.2, 24.8), up,
+        Particle p = new ExplodingParticle(position, dir * rnd.RandomDouble(4.0, 8.0), up,
                                   new Vector3(rnd.RandomFloat(0.1f, 1.0f), rnd.RandomFloat(0.1f, 1.0f), rnd.RandomFloat(0.1f, 1.0f)),
                                   rnd.RandomDouble(1.5, 2.0), time, rnd.RandomDouble(1.0, 2.0));
         fw.AddParticle(p);
@@ -264,7 +264,7 @@ namespace _087fireworks
       if (fw.particleDynamic)
       {
         velocity -= dt * 0.981 * up;
-        velocity -= dt * (0.1 * velocity.Length + 0.1 * velocity.Length * velocity.Length) * velocity;
+        velocity -= dt * (0.5 * velocity.Length * velocity.Length) * velocity.Normalized();
         double extinction = Math.Pow(0.9, dt);
         size *= extinction;
         color *= (float)extinction;
@@ -314,19 +314,18 @@ namespace _087fireworks
   {
     public ExplodingParticle (Vector3d pos, Vector3d vel, Vector3d up, Vector3 col, double siz, double time, double age) : base(pos, vel, up, col, siz, time, age)
     {
-
     }
 
     public override bool Simulate (double time, Fireworks fw)
     {
-      if(time > maxAge)
+      if (time > maxAge)
       {
         int subParticlesCount = Fireworks.rnd.Next(250, 300);
-        double speed = Fireworks.GetRandomNumber(0.5, 5.6);
+        double speed = Fireworks.GetRandomNumber(0.5, 2.6);
         for (int i = 0; i < subParticlesCount; i++)
         {
           Vector3d direction = (new Vector3d(Fireworks.GetRandomNumber(-1d, 1d), Fireworks.GetRandomNumber(-1d, 1d), Fireworks.GetRandomNumber(-1d, 1d))).Normalized();
-          Particle particle = new Particle(position, direction * speed * Launcher.rnd.Normal(1.0, 0.1), up,
+          Particle particle = new Particle(position, 0.5 * velocity + direction * speed * Launcher.rnd.Normal(1.0, 0.1), up,
                                   new Vector3(color.X * (1f + (float)Launcher.rnd.Normal(0, 0.2)), color.Y * (1f + (float)Launcher.rnd.Normal(0, 0.2)),
                                   color.Z * (1f + (float)Launcher.rnd.Normal(0, 0.2))) ,
                                   size + (float)Fireworks.GetRandomNumber(-0.1, 0.1), time, (float)Fireworks.GetRandomNumber(0.8, 1.5));
@@ -517,7 +516,7 @@ namespace _087fireworks
       // launchers: frequency
       if (Util.TryParse(p, "freq", ref freq))
       {
-        if (freq < 1.0)
+        if (freq < 0.1)
           freq = 10.0;
         foreach (var l in launchers)
           l.frequency = freq;
@@ -765,7 +764,7 @@ namespace _087fireworks
     static void InitParams (out string param, out string tooltip, out string name, out MouseButtons trackballButton, out Vector3 center, out float diameter,
                             out bool useTexture, out bool globalColor, out bool useNormals, out bool usePtSize)
     {
-      param           = "launchers=5,freq=1.0,max=60000,slow=0.25,dynamic=1,variance=0.1,ticks=0";
+      param           = "launchers=5,freq=1.0,max=60000,slow=0.25,dynamic=1,variance=0.05,ticks=0";
       tooltip         = "launchers,freq,max,slow,dynamic,variance,ticks,screencast";
       trackballButton = MouseButtons.Left;
       center          = new Vector3(0.0f, 1.0f, 0.0f);
