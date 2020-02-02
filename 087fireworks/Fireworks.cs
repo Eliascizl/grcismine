@@ -51,7 +51,7 @@ namespace _087fireworks
     /// <summary>
     /// Shared random generator. Should be Locked if used in multi-thread environment.
     /// </summary>
-    static RandomJames rnd = new RandomJames();
+    internal static RandomJames rnd = new RandomJames();
 
     /// <summary>
     /// Simulate object to the given time.
@@ -73,9 +73,9 @@ namespace _087fireworks
       {
         // emit a new particle:
         Vector3d dir = Geometry.RandomDirectionNormal(rnd, aim, fw.variance);         // random direction around 'aim'
-        Particle p = new Particle(position, dir * rnd.RandomDouble(0.2, 0.8), up,
+        Particle p = new ExplodingParticle(position, dir * rnd.RandomDouble(8.2, 24.8), up,
                                   new Vector3(rnd.RandomFloat(0.1f, 1.0f), rnd.RandomFloat(0.1f, 1.0f), rnd.RandomFloat(0.1f, 1.0f)),
-                                  rnd.RandomDouble(0.2, 4.0), time, rnd.RandomDouble(2.0, 12.0));
+                                  rnd.RandomDouble(1.5, 2.0), time, rnd.RandomDouble(1.0, 2.0));
         fw.AddParticle(p);
         probability -= 1.0;
       }
@@ -85,13 +85,13 @@ namespace _087fireworks
       return true;
     }
 
-    public Launcher (double freq, Vector3d? pos = null, Vector3d? _aim = null, Vector3d? _up = null)
+    public Launcher (double freq, Vector3d? pos = null, Vector3d? aim = null, Vector3d? up = null)
     {
       position = pos ?? Vector3d.Zero;
-      aim = _aim ?? new Vector3d(0.1, 1.0, -0.1);
-      aim.Normalize();
-      up = _up ?? new Vector3d(0.5, 0.0, 0.5);
-      up.Normalize();
+      this.aim = aim ?? new Vector3d(0.1, 1.0, -0.1);
+      this.aim.Normalize();
+      this.up = up ?? new Vector3d(0.5, 0.0, 0.5);
+      this.up.Normalize();
       frequency = freq;      // number of emitted particles per second
       simTime = 0.0;
     }
@@ -232,11 +232,11 @@ namespace _087fireworks
     /// </summary>
     public double simTime;
 
-    public Particle (Vector3d pos, Vector3d vel, Vector3d _up, Vector3 col, double siz, double time, double age)
+    public Particle (Vector3d pos, Vector3d vel, Vector3d up, Vector3 col, double siz, double time, double age)
     {
       position = pos;
       velocity = vel;
-      up = _up;
+      this.up = up;
       color = col;
       size = siz;
       simTime = time;
@@ -249,7 +249,7 @@ namespace _087fireworks
     /// <param name="time">Required target time.</param>
     /// <param name="fw">Simulation context.</param>
     /// <returns>False in case of expiry.</returns>
-    public bool Simulate (double time, Fireworks fw)
+    public virtual bool Simulate (double time, Fireworks fw)
     {
       if (time <= simTime)
         return true;
@@ -263,7 +263,8 @@ namespace _087fireworks
 
       if (fw.particleDynamic)
       {
-        velocity += dt * -0.05 * up;
+        velocity -= dt * 0.981 * up;
+        velocity -= dt * (0.1 * velocity.Length + 0.1 * velocity.Length * velocity.Length) * velocity;
         double extinction = Math.Pow(0.9, dt);
         size *= extinction;
         color *= (float)extinction;
@@ -306,6 +307,33 @@ namespace _087fireworks
       Fill(ref ptr, ref position);
 
       return total;
+    }
+  }
+
+  public class ExplodingParticle : Particle
+  {
+    public ExplodingParticle (Vector3d pos, Vector3d vel, Vector3d up, Vector3 col, double siz, double time, double age) : base(pos, vel, up, col, siz, time, age)
+    {
+
+    }
+
+    public override bool Simulate (double time, Fireworks fw)
+    {
+      if(time > maxAge)
+      {
+        int subParticlesCount = Fireworks.rnd.Next(250, 300);
+        double speed = Fireworks.GetRandomNumber(0.5, 5.6);
+        for (int i = 0; i < subParticlesCount; i++)
+        {
+          Vector3d direction = (new Vector3d(Fireworks.GetRandomNumber(-1d, 1d), Fireworks.GetRandomNumber(-1d, 1d), Fireworks.GetRandomNumber(-1d, 1d))).Normalized();
+          Particle particle = new Particle(position, direction * speed * Launcher.rnd.Normal(1.0, 0.1), up,
+                                  new Vector3(color.X * (1f + (float)Launcher.rnd.Normal(0, 0.2)), color.Y * (1f + (float)Launcher.rnd.Normal(0, 0.2)),
+                                  color.Z * (1f + (float)Launcher.rnd.Normal(0, 0.2))) ,
+                                  size + (float)Fireworks.GetRandomNumber(-0.1, 0.1), time, (float)Fireworks.GetRandomNumber(0.8, 1.5));
+          fw.AddParticle(particle);
+        }
+      }
+      return base.Simulate(time, fw);
     }
   }
 
@@ -368,6 +396,8 @@ namespace _087fireworks
     /// This limit is used for render-buffer allocation.
     /// </summary>
     public int MaxLaunchers => 20;
+
+    private int launchersCount = 5;
 
     public Particle GetParticle (int i)
     {
@@ -443,6 +473,13 @@ namespace _087fireworks
       axes = new CoordinateAxes(1.0f, ticks, ticks, ticks);
     }
 
+    public static Random rnd = new Random();
+
+    public static double GetRandomNumber (double minimum, double maximum)
+    {
+      return rnd.NextDouble() * (maximum - minimum) + minimum;
+    }
+
     /// <summary>
     /// [Re-]initialize the simulation system.
     /// </summary>
@@ -456,10 +493,10 @@ namespace _087fireworks
       particles.Clear();
       launchers.Clear();
 
-      Launcher l = new Launcher(freq, new Vector3d(-0.5, 0.0, 0.0), null, new Vector3d(-0.5, 0.0, -0.5));
-      AddLauncher(l);
-      l = new Launcher(freq, new Vector3d(0.5, 0.0, 0.0));
-      AddLauncher(l);
+      for (int i = 0; i < launchersCount; i++)
+      {
+        AddLauncher(new Launcher(freq, new Vector3d(GetRandomNumber(-5d,5d), 0d, GetRandomNumber(-5d, 5d)), null, new Vector3d(0d, 1d, 0d)));
+      }
 
       Frames = 0;
       Time = 0.0f;
@@ -526,6 +563,18 @@ namespace _087fireworks
       bool dyn = false;
       if (Util.TryParse(p, "dynamic", ref dyn))
         particleDynamic = dyn;
+
+      if (Util.TryParse(p, "launchers", ref launchersCount))
+      {
+        if(launchersCount < 1)
+        {
+          launchersCount = 1;
+        }
+        else if(launchersCount > MaxLaunchers)
+        {
+          launchersCount = MaxLaunchers;
+        }
+      }
     }
 
     public void AddLauncher (Launcher la)
@@ -716,8 +765,8 @@ namespace _087fireworks
     static void InitParams (out string param, out string tooltip, out string name, out MouseButtons trackballButton, out Vector3 center, out float diameter,
                             out bool useTexture, out bool globalColor, out bool useNormals, out bool usePtSize)
     {
-      param           = "freq=4000.0,max=60000,slow=0.25,dynamic=1,variance=0.1,ticks=0";
-      tooltip         = "freq,max,slow,dynamic,variance,ticks,screencast";
+      param           = "launchers=5,freq=1.0,max=60000,slow=0.25,dynamic=1,variance=0.1,ticks=0";
+      tooltip         = "launchers,freq,max,slow,dynamic,variance,ticks,screencast";
       trackballButton = MouseButtons.Left;
       center          = new Vector3(0.0f, 1.0f, 0.0f);
       diameter        = 5.0f;
@@ -726,7 +775,7 @@ namespace _087fireworks
       useNormals      = false;
       usePtSize       = true;
 
-      name = "Josef Pelikán";
+      name = "Eliáš Cizl";
     }
 
     /// <summary>
